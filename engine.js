@@ -130,25 +130,6 @@ module.exports = function(options) {
           }
         },
         {
-          type: hasScopes ? 'list' : 'input',
-          name: 'scope',
-          when: !options.skipScope,
-          choices: hasScopes ? scopes : undefined,
-          message:
-            'What is the scope of this change (e.g. component or file name): ' +
-            (hasScopes ? '(select from the list)' : '(press enter to skip)'),
-          default: options.defaultScope,
-          filter: function(value) {
-            return value.trim().toLowerCase();
-          }
-        },
-        {
-          type: 'input',
-          name: 'customScope',
-          when: (({ scope }) => scope === 'custom'),
-          message: 'Type custom scope (press enter to skip)'
-        },
-        {
           type: 'limitedInput',
           name: 'subject',
           message: 'Write a short, imperative tense description of the change:',
@@ -172,65 +153,6 @@ module.exports = function(options) {
             return filterSubject(subject);
           }
         },
-        {
-          type: 'input',
-          name: 'body',
-          message:
-            'Provide a longer description of the change: (press enter to skip)\n',
-          default: options.defaultBody
-        },
-        {
-          type: 'confirm',
-          name: 'isBreaking',
-          message: 'Are there any breaking changes?',
-          default: false
-        },
-        {
-          type: 'confirm',
-          name: 'isBreaking',
-          message: 'You do know that this will bump the major version, are you sure?',
-          default: false,
-          when: function(answers) {
-            return answers.isBreaking;
-          }
-        },
-        {
-          type: 'input',
-          name: 'breaking',
-          message: 'Describe the breaking changes:\n',
-          when: function(answers) {
-            return answers.isBreaking;
-          }
-        },
-
-        {
-          type: 'confirm',
-          name: 'isIssueAffected',
-          message: 'Does this change affect any open issues?',
-          default: options.defaultIssues ? true : false,
-          when: !options.jiraMode
-        },
-        {
-          type: 'input',
-          name: 'issuesBody',
-          default: '-',
-          message:
-            'If issues are closed, the commit requires a body. Please enter a longer description of the commit itself:\n',
-          when: function(answers) {
-            return (
-              answers.isIssueAffected && !answers.body && !answers.breakingBody
-            );
-          }
-        },
-        {
-          type: 'input',
-          name: 'issues',
-          message: 'Add issue references (e.g. "fix #123", "re #123".):\n',
-          when: function(answers) {
-            return answers.isIssueAffected;
-          },
-          default: options.defaultIssues ? options.defaultIssues : undefined
-        }
       ]).then(async function(answers) {
         var wrapOptions = {
           trim: true,
@@ -240,13 +162,6 @@ module.exports = function(options) {
           width: options.maxLineWidth
         };
 
-        // parentheses are only needed when a scope is present
-        const providedScope = getProvidedScope(answers);
-        var scope = providedScope ? '(' + providedScope + ')' : '';
-
-        const addExclamationMark = options.exclamationMark && answers.breaking;
-        scope = addExclamationMark ? scope + '!' : scope;
-
         // Get Jira issue prepend and append decorators
         var prepend = options.jiraPrepend || ''
         var append = options.jiraAppend || ''
@@ -254,26 +169,6 @@ module.exports = function(options) {
 
         // Hard limit this line in the validate
         const head = getJiraIssueLocation(options.jiraLocation, answers.type, scope, jiraWithDecorators, answers.subject);
-
-        // Wrap these lines at options.maxLineWidth characters
-        var body = answers.body ? wrap(answers.body, wrapOptions) : false;
-        if (options.jiraMode && options.jiraLocation === 'post-body') {
-          if (body === false) {
-            body = '';
-          } else {
-            body += "\n\n";
-          }
-          body += jiraWithDecorators.trim();
-        }
-
-        // Apply breaking change prefix, removing it if already present
-        var breaking = answers.breaking ? answers.breaking.trim() : '';
-        breaking = breaking
-          ? 'BREAKING CHANGE: ' + breaking.replace(/^BREAKING CHANGE: /, '')
-          : '';
-        breaking = breaking ? wrap(breaking, wrapOptions) : false;
-
-        var issues = answers.issues ? wrap(answers.issues, wrapOptions) : false;
 
         const fullCommit = filter([head, body, breaking, issues]).join('\n\n');
 
